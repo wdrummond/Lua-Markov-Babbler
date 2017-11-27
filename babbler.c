@@ -1,13 +1,17 @@
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
+#include <ctype.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
 
+
+int BUFFER_SIZE = 1000000;
 
 
 int babbler(lua_State *L) {
@@ -15,23 +19,66 @@ int babbler(lua_State *L) {
 	return 0;
 }
 
-int tokenizer() {
+int tokenizer(lua_State *L) {
 
-	return 0;
+	const char *text = lua_tostring(L, 1);
+	int offset = lua_tonumber(L, 2);
+
+	char token[BUFFER_SIZE];
+
+	int j = 0;
+
+	while ( text[offset] != NULL && !isspace(text[offset]) )
+	{
+		if( isalnum(text[offset]) )
+		{
+			token[j] = text[offset];
+			token[j] = tolower(token[j]);
+			j += 1;
+		}
+
+		offset += 1;
+	}
+
+	//printf("%c \n", text[offset]);
+
+	//printf( "%s \n", token );
+
+	lua_pushstring(L, token);
+	lua_pushnumber(L, offset);
+
+	for (int i = 0; i < j; i++)
+	{
+		token[i] = 0;
+	}
+
+	return 2;
 }
 
-int shingler() {
+void stringRemoveNonAlphaNum(char *str)
+{
+    unsigned long i = 0;
+    unsigned long j = 0;
+    char c;
 
-	return 0;
+    while ((c = str[i++]) != '\0')
+    {
+        if (isalnum(c))
+        {
+            str[j++] = c;
+        }
+    }
+    str[j] = '\0';
+
+    //printf(str);
+	//    return str;
 }
 
-int makeTable() {
-
-	return 0;
-}
-
-char *readFile(char *filename) {
+int readFile(lua_State *L) {
 	// get the size of the file
+
+	char *filename = lua_tostring(L, 1);
+
 	struct stat info;
 	int status = stat(filename, &info);
 	if (status < 0) {
@@ -80,31 +127,35 @@ char *readFile(char *filename) {
 		exit(1);
 	}
 
-	return buffer;
+	lua_pushstring(L, buffer);
+	return 1;
 }
 
 int main(int argc, char *argv[]) {
 	//command line arg handling
 	int n = 0;
+	int amount = 0;
 	char filename;
-	if (argc == 3) {
-		n = *argv[2] - '0';
+
+	if (argc == 4) {
+		n = *argv[3] - '0';
 	} else {
 		n = 3;
 	}
 
+	amount = atoi(argv[2]);
+
+	//printf("%d", amount);
+
+
 	// setup
 	lua_State *L = luaL_newstate();
 	luaL_openlibs(L);
-
-	//lua_pushinteger(L, n);
 	
 	// register the c functions
 	lua_register(L, "cbabbler", babbler);
-	//lua_register(L, "creadFile", readFile);
+	lua_register(L, "creadFile", readFile);
 	lua_register(L, "ctokenizer", tokenizer);
-	lua_register(L, "cshingler", shingler);
-	lua_register(L, "cmakeTable", makeTable);
 
 	// load the lua file
 	if (luaL_dofile(L, "babbler.lua")) {
@@ -115,8 +166,9 @@ int main(int argc, char *argv[]) {
 	// call babble
 	lua_getglobal(L, "driver");
 	lua_pushstring(L, argv[1]);
+	lua_pushnumber(L, amount);
 	lua_pushnumber(L, n);
-	lua_pcall(L, 2, 0, 0);
+	lua_pcall(L, 3, 0, 0);
 
 	// shut down
 	lua_close(L);
